@@ -32,4 +32,7 @@ def index():
 
 @app.route("/price")
 def price():
-    return jsonify({"price": fetch_btc_price(
+    return jsonify({"price": fetch_btc_price()})
+
+if __name__ == "__main__":
+    app.run(debug=True)
