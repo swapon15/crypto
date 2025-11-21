@@ -13,7 +13,7 @@ def fetch_btc_price():
         return data["bitcoin"]["usd"]
     except Exception as e:
         # keep simple: return None on error
-        return {"error": str(e)}
+        return 0
 
 @app.route("/")
 def index():
