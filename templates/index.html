@@ -1,85 +1,85 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>BTC Live Price</title>
+    <meta charset="utf-8">
+    <title>BTC Live Price</title>
 
-  <!-- Tailwind (CDN) -->
-  <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex items-center justify-center">
-  <div class="max-w-3xl w-full p-6">
-    <h1 class="text-3xl font-bold text-center mb-6">Bitcoin (BTC) — Live</h1>
+    <div class="max-w-3xl w-full p-6">
+        <h1 class="text-3xl font-bold text-center mb-6">Bitcoin (BTC) — Live</h1>
 
-    <div class="text-center">
-      <div id="price" class="text-5xl font-extrabold mb-4">Loading…</div>
-      <div id="status" class="text-sm text-gray-400 mb-6">Updating every 2s</div>
+        <div class="text-center">
+            <div id="price" class="text-5xl font-extrabold mb-4">Loading…</div>
+            <div id="status" class="text-sm text-gray-400 mb-6">Updating every 2s</div>
+        </div>
+
+        <div class="bg-gray-800 p-4 rounded-lg">
+            <canvas id="chart" height="200"></canvas>
+        </div>
     </div>
 
-    <div class="bg-gray-800 p-4 rounded-lg">
-      <canvas id="chart" height="200"></canvas>
-    </div>
-  </div>
+<script>
+const prices = [];
+const labels = [];
+const maxPoints = 30;
 
-  <script>
-    // tiny state
-    const prices = [];
-    const labels = [];
-    const maxPoints = 30;
-
-    // chart setup
-    const ctx = document.getElementById('chart').getContext('2d');
-    const chart = new Chart(ctx, {
-      type: 'line',
-      data: {
+const ctx = document.getElementById('chart').getContext('2d');
+const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
         labels: labels,
         datasets: [{
-          label: 'BTC USD',
-          data: prices,
-          tension: 0.3,
-          borderWidth: 2,
-          fill: false
+            label: 'BTC USD',
+            data: prices,
+            tension: 0.3,
+            borderWidth: 2,
+            fill: false,
+            borderColor: 'rgb(34,197,94)'
         }]
-      },
-      options: {
-        scales: {
-          y: { beginAtZero: false }
-        },
+    },
+    options: {
+        scales: { y: { beginAtZero: false } },
         plugins: { legend: { display: false } }
-      }
-    });
+    }
+});
 
-    async function update() {
-      try {
-        const res = await fetch('/price');
-        const js = await res.json();
-        const price = js.price;
-        if (price === null || price === undefined) {
-          document.getElementById('status').textContent = 'Error fetching price';
-          return;
+async function updatePrice() {
+    try {
+        const res = await fetch("/price");
+        const data = await res.json();
+        const price = Number(data.price);
+
+        if (isNaN(price)) {
+            document.getElementById("price").textContent = "Error fetching price";
+            return;
         }
-        document.getElementById('price').textContent = '$' + Number(price).toLocaleString();
 
-        // push to arrays
+        document.getElementById("price").textContent = "$" + price.toLocaleString();
+        document.getElementById("status").textContent = "Last updated: " + new Date().toLocaleTimeString();
+
+        // update chart
+        prices.push(price);
         labels.push(new Date().toLocaleTimeString());
-        prices.push(Number(price));
-
         if (prices.length > maxPoints) {
-          prices.shift(); labels.shift();
+            prices.shift();
+            labels.shift();
         }
         chart.update();
-        document.getElementById('status').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
-      } catch (err) {
-        document.getElementById('status').textContent = 'Network error';
-      }
+    } catch (err) {
+        document.getElementById("price").textContent = "Error fetching price";
+        document.getElementById("status").textContent = "Network error, retrying...";
     }
+}
 
-    // initial + periodic refresh
-    update();
-    setInterval(update, 7000);
-  </script>
+// Initial + repeat every 2 seconds
+updatePrice();
+setInterval(updatePrice, 2000);
+</script>
 </body>
 </html>
