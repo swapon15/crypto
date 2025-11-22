@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>BTC Live Price</title>
+    <title>XRP, ADA & DOGE Live Prices</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,20 +12,35 @@
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex items-center justify-center">
     <div class="max-w-3xl w-full p-6">
-        <h1 class="text-3xl font-bold text-center mb-6">Bitcoin (BTC) — Live</h1>
+        <h1 class="text-3xl font-bold text-center mb-6">Live Prices — XRP, ADA & DOGE</h1>
 
-        <div class="text-center">
-            <div id="price" class="text-5xl font-extrabold mb-4">Loading…</div>
-            <div id="status" class="text-sm text-gray-400 mb-6">Updating every 2s</div>
+        <div class="grid grid-cols-3 gap-4 text-center mb-6">
+            <div>
+                <div class="text-sm text-gray-400">Ripple (XRP)</div>
+                <div id="price-xrp" class="text-4xl font-extrabold mt-2">Loading…</div>
+            </div>
+            <div>
+                <div class="text-sm text-gray-400">Cardano (ADA)</div>
+                <div id="price-ada" class="text-4xl font-extrabold mt-2">Loading…</div>
+            </div>
+            <div>
+                <div class="text-sm text-gray-400">Dogecoin (DOGE)</div>
+                <div id="price-doge" class="text-4xl font-extrabold mt-2">Loading…</div>
+            </div>
+        </div>
+        <div class="text-center mb-6">
+            <div id="status" class="text-sm text-gray-400">Updating every 2s</div>
         </div>
 
         <div class="bg-gray-800 p-4 rounded-lg">
-            <canvas id="chart" height="200"></canvas>
-        </div>
+                <canvas id="chart" height="200"></canvas>
+            </div>
     </div>
 
 <script>
-const prices = [];
+const xrpPrices = [];
+const adaPrices = [];
+const dogePrices = [];
 const labels = [];
 const maxPoints = 30;
 
@@ -34,18 +49,36 @@ const chart = new Chart(ctx, {
     type: 'line',
     data: {
         labels: labels,
-        datasets: [{
-            label: 'BTC USD',
-            data: prices,
-            tension: 0.3,
-            borderWidth: 2,
-            fill: false,
-            borderColor: 'rgb(34,197,94)'
-        }]
+        datasets: [
+            {
+                label: 'XRP USD',
+                data: xrpPrices,
+                tension: 0.3,
+                borderWidth: 2,
+                fill: false,
+                borderColor: 'rgb(34,197,94)'
+            },
+            {
+                label: 'ADA USD',
+                data: adaPrices,
+                tension: 0.3,
+                borderWidth: 2,
+                fill: false,
+                borderColor: 'rgb(59,130,246)'
+            },
+            {
+                label: 'DOGE USD',
+                data: dogePrices,
+                tension: 0.3,
+                borderWidth: 2,
+                fill: false,
+                borderColor: 'rgb(234,88,12)'
+            }
+        ]
     },
     options: {
         scales: { y: { beginAtZero: false } },
-        plugins: { legend: { display: false } }
+        plugins: { legend: { display: true } }
     }
 });
 
@@ -53,26 +86,46 @@ async function updatePrice() {
     try {
         const res = await fetch("/price");
         const data = await res.json();
-        const price = Number(data.price);
+        const priceXrp = Number(data.xrp);
+        const priceAda = Number(data.ada);
+        const priceDoge = Number(data.doge);
 
-        if (isNaN(price)) {
-            document.getElementById("price").textContent = "Error fetching price";
+        if (isNaN(priceXrp) && isNaN(priceAda) && isNaN(priceDoge)) {
+            document.getElementById("price-xrp").textContent = "Error";
+            document.getElementById("price-ada").textContent = "Error";
+            document.getElementById("price-doge").textContent = "Error";
+            document.getElementById("status").textContent = "Error fetching prices";
             return;
         }
 
-        document.getElementById("price").textContent = "$" + price.toLocaleString();
+        if (!isNaN(priceXrp)) {
+            document.getElementById("price-xrp").textContent = "$" + priceXrp.toLocaleString();
+        }
+        if (!isNaN(priceAda)) {
+            document.getElementById("price-ada").textContent = "$" + priceAda.toLocaleString();
+        }
+        if (!isNaN(priceDoge)) {
+            document.getElementById("price-doge").textContent = "$" + priceDoge.toLocaleString();
+        }
+
         document.getElementById("status").textContent = "Last updated: " + new Date().toLocaleTimeString();
 
         // update chart
-        prices.push(price);
+        xrpPrices.push(isNaN(priceXrp) ? null : priceXrp);
+        adaPrices.push(isNaN(priceAda) ? null : priceAda);
+        dogePrices.push(isNaN(priceDoge) ? null : priceDoge);
         labels.push(new Date().toLocaleTimeString());
-        if (prices.length > maxPoints) {
-            prices.shift();
+        if (labels.length > maxPoints) {
             labels.shift();
+            xrpPrices.shift();
+            adaPrices.shift();
+            dogePrices.shift();
         }
         chart.update();
     } catch (err) {
-        document.getElementById("price").textContent = "Error fetching price";
+        document.getElementById("price-xrp").textContent = "Error";
+        document.getElementById("price-ada").textContent = "Error";
+        document.getElementById("price-doge").textContent = "Error";
         document.getElementById("status").textContent = "Network error, retrying...";
     }
 }

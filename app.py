@@ -3,36 +3,62 @@ import requests
 
 app = Flask(__name__)
 
-# Cache last good price
-last_price = 0
+# Cache last known good prices per coin (CoinGecko ids)
+last_prices = {"ripple": 0.0, "cardano": 0.0, "dogecoin": 0.0}
 
-def fetch_btc_price(retries=3):
-    global last_price
+
+def fetch_prices(coins=None, retries=3):
+    """Fetch USD prices for the given CoinGecko ids.
+
+    Returns a dict mapping coin id -> price (float) using cached last known
+    values when live fetch fails.
+    """
+    global last_prices
+    if coins is None:
+        coins = ["ripple", "cardano", "dogecoin"]
+    if isinstance(coins, str):
+        coins = [c.strip() for c in coins.split(",") if c.strip()]
+
     url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {"ids": "bitcoin", "vs_currencies": "usd"}
-    
+    params = {"ids": ",".join(coins), "vs_currencies": "usd"}
+
     for attempt in range(retries):
         try:
             resp = requests.get(url, params=params, timeout=5)
             resp.raise_for_status()
             data = resp.json()
-            price = data.get("bitcoin", {}).get("usd")
-            if price is not None:
-                last_price = price
-                return price
-        except:
-            pass  # try again
 
-    # If all retries fail, return last known good price
-    return last_price
+            result = {}
+            for coin in coins:
+                price = data.get(coin, {}).get("usd")
+                if price is not None:
+                    last_prices[coin] = price
+                result[coin] = last_prices.get(coin)
+
+            return result
+        except Exception:
+            # try again
+            pass
+
+    # If all retries fail, return last known good prices for requested coins
+    return {coin: last_prices.get(coin) for coin in coins}
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
 @app.route("/price")
 def price():
-    return jsonify({"price": fetch_btc_price()})
+    prices = fetch_prices()
+    # Return friendly keys for frontend: xrp, ada, doge
+    return jsonify({
+        "xrp": prices.get("ripple"),
+        "ada": prices.get("cardano"),
+        "doge": prices.get("dogecoin")
+    })
+
 
 if __name__ == "__main__":
     app.run(debug=True)
