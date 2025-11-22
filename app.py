@@ -51,13 +51,10 @@ def index():
 
 @app.route("/price")
 def price():
+    # Return a dynamic mapping of CoinGecko id -> price (USD).
+    # Frontend will render whatever currency ids are returned here.
     prices = fetch_prices()
-    # Return friendly keys for frontend: xrp, ada, doge
-    return jsonify({
-        "xrp": prices.get("ripple"),
-        "ada": prices.get("cardano"),
-        "doge": prices.get("dogecoin")
-    })
+    return jsonify(prices)
 
 
 if __name__ == "__main__":

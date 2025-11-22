@@ -12,116 +12,143 @@
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex items-center justify-center">
     <div class="max-w-3xl w-full p-6">
-        <h1 class="text-3xl font-bold text-center mb-6">Live Prices — XRP, ADA & DOGE</h1>
+        <h1 class="text-3xl font-bold text-center mb-6">Live Prices</h1>
 
-        <div class="grid grid-cols-3 gap-4 text-center mb-6">
-            <div>
-                <div class="text-sm text-gray-400">Ripple (XRP)</div>
-                <div id="price-xrp" class="text-4xl font-extrabold mt-2">Loading…</div>
-            </div>
-            <div>
-                <div class="text-sm text-gray-400">Cardano (ADA)</div>
-                <div id="price-ada" class="text-4xl font-extrabold mt-2">Loading…</div>
-            </div>
-            <div>
-                <div class="text-sm text-gray-400">Dogecoin (DOGE)</div>
-                <div id="price-doge" class="text-4xl font-extrabold mt-2">Loading…</div>
-            </div>
+        <div id="cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <!-- Per-currency cards will be injected here -->
         </div>
+
         <div class="text-center mb-6">
             <div id="status" class="text-sm text-gray-400">Updating every 2s</div>
         </div>
-
-        <div class="bg-gray-800 p-4 rounded-lg">
-                <canvas id="chart" height="200"></canvas>
-            </div>
     </div>
 
 <script>
-const xrpPrices = [];
-const adaPrices = [];
-const dogePrices = [];
-const labels = [];
+// Dynamic per-coin data structures
+const priceSeries = {};   // coinId -> array of numbers/null
+const labelSeries = {};   // coinId -> array of labels (strings)
+const charts = {};        // coinId -> Chart instance
 const maxPoints = 30;
 
-const ctx = document.getElementById('chart').getContext('2d');
-const chart = new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: labels,
-        datasets: [
-            {
-                label: 'XRP USD',
-                data: xrpPrices,
+// Helpful mapping from CoinGecko id -> display symbol (fallback to id uppercase)
+const SYMBOL_MAP = {
+    ripple: 'XRP',
+    cardano: 'ADA',
+    dogecoin: 'DOGE',
+    bitcoin: 'BTC',
+    ethereum: 'ETH'
+};
+
+// No global chart — each coin gets its own canvas/chart created on demand
+
+function formatSymbol(coinId) {
+    return SYMBOL_MAP[coinId] || coinId.toUpperCase();
+}
+
+function createCard(coinId) {
+    const cards = document.getElementById('cards');
+    const card = document.createElement('div');
+    card.className = 'bg-gray-800 p-4 rounded-lg';
+    card.id = 'card-' + coinId;
+
+    const title = document.createElement('div');
+    title.className = 'text-sm text-gray-400';
+    title.textContent = formatSymbol(coinId) + ' (' + coinId + ')';
+
+    const priceEl = document.createElement('div');
+    priceEl.id = 'price-' + coinId;
+    priceEl.className = 'text-2xl font-extrabold mt-2';
+    priceEl.textContent = 'Loading…';
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'chart-' + coinId;
+    canvas.height = 160;
+
+    card.appendChild(title);
+    card.appendChild(priceEl);
+    card.appendChild(canvas);
+    cards.appendChild(card);
+
+    // init data containers
+    priceSeries[coinId] = [];
+    labelSeries[coinId] = [];
+
+    const ctx = canvas.getContext('2d');
+    charts[coinId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labelSeries[coinId],
+            datasets: [{
+                label: formatSymbol(coinId) + ' USD',
+                data: priceSeries[coinId],
                 tension: 0.3,
                 borderWidth: 2,
                 fill: false,
-                borderColor: 'rgb(34,197,94)'
-            },
-            {
-                label: 'ADA USD',
-                data: adaPrices,
-                tension: 0.3,
-                borderWidth: 2,
-                fill: false,
-                borderColor: 'rgb(59,130,246)'
-            },
-            {
-                label: 'DOGE USD',
-                data: dogePrices,
-                tension: 0.3,
-                borderWidth: 2,
-                fill: false,
-                borderColor: 'rgb(234,88,12)'
-            }
-        ]
-    },
-    options: {
-        scales: { y: { beginAtZero: false } },
-        plugins: { legend: { display: true } }
-    }
-});
+                borderColor: randomColorFor(coinId)
+            }]
+        },
+        options: {
+            scales: { y: { beginAtZero: false } },
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+function randomColorFor(key) {
+    // stable-ish color per key using hash
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (h << 5) - h + key.charCodeAt(i);
+    const r = (h & 0xFF0000) >> 16;
+    const g = (h & 0x00FF00) >> 8;
+    const b = (h & 0x0000FF);
+    // normalize to nicer palette
+    const rr = Math.abs(r) % 200 + 30;
+    const gg = Math.abs(g) % 200 + 30;
+    const bb = Math.abs(b) % 200 + 30;
+    return `rgb(${rr},${gg},${bb})`;
+}
 
 async function updatePrice() {
     try {
-        const res = await fetch("/price");
+        const res = await fetch('/price');
         const data = await res.json();
-        const priceXrp = Number(data.xrp);
-        const priceAda = Number(data.ada);
-        const priceDoge = Number(data.doge);
 
-        if (isNaN(priceXrp) && isNaN(priceAda) && isNaN(priceDoge)) {
-            document.getElementById("price-xrp").textContent = "Error";
-            document.getElementById("price-ada").textContent = "Error";
-            document.getElementById("price-doge").textContent = "Error";
-            document.getElementById("status").textContent = "Error fetching prices";
+        const nowLabel = new Date().toLocaleTimeString();
+        const coinIds = Object.keys(data || {});
+        if (coinIds.length === 0) {
+            document.getElementById('status').textContent = 'No prices returned';
             return;
         }
 
-        if (!isNaN(priceXrp)) {
-            document.getElementById("price-xrp").textContent = "$" + priceXrp.toLocaleString();
-        }
-        if (!isNaN(priceAda)) {
-            document.getElementById("price-ada").textContent = "$" + priceAda.toLocaleString();
-        }
-        if (!isNaN(priceDoge)) {
-            document.getElementById("price-doge").textContent = "$" + priceDoge.toLocaleString();
+        for (const coin of coinIds) {
+            const priceVal = data[coin];
+
+            // create UI/chart for new coins
+            if (!charts[coin]) createCard(coin);
+
+            const priceEl = document.getElementById('price-' + coin);
+            if (priceVal === null || priceVal === undefined) {
+                priceEl.textContent = '—';
+            } else {
+                const n = Number(priceVal);
+                priceEl.textContent = isNaN(n) ? '—' : '$' + n.toLocaleString();
+            }
+
+            // update series
+            priceSeries[coin].push(priceVal === null || priceVal === undefined ? null : Number(priceVal));
+            labelSeries[coin].push(nowLabel);
+            if (labelSeries[coin].length > maxPoints) {
+                labelSeries[coin].shift();
+                priceSeries[coin].shift();
+            }
+
+            // update chart
+            charts[coin].data.labels = labelSeries[coin];
+            charts[coin].data.datasets[0].data = priceSeries[coin];
+            charts[coin].update();
         }
 
-        document.getElementById("status").textContent = "Last updated: " + new Date().toLocaleTimeString();
-
-        // update chart
-        xrpPrices.push(isNaN(priceXrp) ? null : priceXrp);
-        adaPrices.push(isNaN(priceAda) ? null : priceAda);
-        dogePrices.push(isNaN(priceDoge) ? null : priceDoge);
-        labels.push(new Date().toLocaleTimeString());
-        if (labels.length > maxPoints) {
-            labels.shift();
-            xrpPrices.shift();
-            adaPrices.shift();
-            dogePrices.shift();
-        }
-        chart.update();
+        document.getElementById('status').textContent = 'Last updated: ' + nowLabel;
     } catch (err) {
         document.getElementById("price-xrp").textContent = "Error";
         document.getElementById("price-ada").textContent = "Error";
